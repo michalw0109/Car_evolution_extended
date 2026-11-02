@@ -1,0 +1,89 @@
+import math
+from collections import defaultdict
+
+class Computation:
+    def __init__(self, inputs: list[int], outputs: list[int], marker=None):
+        if marker is None:
+            marker = [0, 1, 1, 1, 1, 1, 1, 1]
+
+        self.INPUTS = inputs
+        self.OUTPUTS = outputs
+        self.MARKER = marker
+
+        self.NR_OF_NEURONS = self.OUTPUTS[len(self.OUTPUTS) - 1] + 1
+
+    def connection_based_sort_feed_forward(self, nn, input_vector):
+
+        connections = nn
+        values = defaultdict(float)
+        inputs_set = set(self.INPUTS)
+
+        # ustaw wejścia
+        for i, v in enumerate(input_vector):
+            values[self.INPUTS[i]] = v
+
+        # krawędzie do przodu (source < target) bez zmian, krawędzie wsteczne
+        # (source > target) odwracamy na target -> source, pętle własne pomijamy
+        forward = []
+        for c in connections:
+            s, t, w = c["source"], c["target"], c["weight"]
+            if s < t:
+                forward.append((s, t, w))
+            elif s > t:
+                forward.append((t, s, w))
+
+        # sortowanie po target ID
+        forward.sort(key=lambda x: x[1])
+
+        # propagacja z aktywacją tanh per neuron po zsumowaniu wszystkich wejść
+        i = 0
+        while i < len(forward):
+            t = forward[i][1]
+            while i < len(forward) and forward[i][1] == t:
+                s, _, w = forward[i]
+                values[t] += values[s] * w
+                i += 1
+            if t not in inputs_set:
+                values[t] = math.tanh(values[t])
+
+        # wyjścia
+        return [values[i] for i in self.OUTPUTS]
+
+
+    def connection_based_max_range_propagation(self, nn, input_vector, max_steps=10, tol=1e-4):
+
+        inputs_set = set(self.INPUTS)
+
+        # pre-build adjacency once per call
+        incoming = defaultdict(list)
+        for c in nn:
+            incoming[c['target']].append((c['source'], c['weight']))
+
+        # initialise: inputs fixed, all others 0
+        values = defaultdict(float)
+        for i, v in enumerate(input_vector):
+            values[self.INPUTS[i]] = v
+
+        for _ in range(max_steps):
+            new_values = defaultdict(float)
+
+            # keep inputs pinned
+            for i, v in enumerate(input_vector):
+                new_values[self.INPUTS[i]] = v
+
+            converged = True
+            for t, edges in incoming.items():
+                if t in inputs_set:
+                    continue
+                raw = sum(values[s] * w for s, w in edges)
+                activated = math.tanh(raw)
+                new_values[t] = activated
+                if abs(activated - values[t]) > tol:
+                    converged = False
+
+            values = new_values
+            if converged:
+                break
+
+        return [values[i] for i in self.OUTPUTS]
+

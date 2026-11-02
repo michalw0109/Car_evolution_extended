@@ -1,0 +1,33 @@
+import random
+from copy import deepcopy
+from Individual import Individual
+
+class Selection:
+    def __init__(self):
+        pass
+
+    def tournament_selection(self, population: list[Individual]):
+        # Returns a REFERENCE to the chosen parent (no copy): parents are only
+        # read during reproduction — crossover clones parent1 and reads parent2,
+        # and neither parent is ever mutated in place.  Avoids a deepcopy per call
+        # (two per child), which dominated the between-generation time.
+        choices = []
+        for i in range(3):
+            r = random.randint(0, len(population) - 1)
+            choices.append(population[r])
+        choices.sort(key=Individual.sortKey, reverse=True)
+        return choices[0]
+
+    def roulette_selection(self, population: list[Individual]):
+
+        total_fitness = sum(ind.fitness for ind in population)
+        if total_fitness == 0:
+            return population[0]
+
+        r = random.uniform(0, total_fitness)
+        cumulative = 0
+
+        for ind in population:
+            cumulative += ind.fitness
+            if cumulative >= r:
+                return ind
